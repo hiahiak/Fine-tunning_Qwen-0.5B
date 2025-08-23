@@ -3,7 +3,7 @@
 本项目基于 Qwen-0.5B-Chat 模型，使用 LoRA（Low-Rank Adaptation）方法进行高效微调，实现了对个人知识（hiahia相关信息）的定制化问答。
 
 ## 目录结构
-其中model需要自行创建下载Qwen 0.5B的原始模型和分词器文件，output在代码运行时会自动创建，提交的项目中并没有对应的model output文件夹。
+其中model需要自行创建下载Qwen 0.5B的原始模型和分词器文件(因为当时链接不上hub和其镜像源，就直接本地部署了)，output在代码运行时会自动创建，其中的best_model.pth是整个模型的所有权重，包括未训练的。提交的项目中并没有对应的model output文件夹。
 ```
 Fine-tunning_Qwen/
 ├── config.json           # 微调超参数配置
