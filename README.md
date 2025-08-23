@@ -2,39 +2,8 @@
 
 本项目基于 Qwen-0.5B-Chat 模型，使用 LoRA（Low-Rank Adaptation）方法进行高效微调，实现了对个人知识（hiahia相关信息）的定制化问答。
 
-> **注意：本项目涉及大模型权重文件（如 .pth、.safetensors），请勿直接推送到 GitHub。建议在 `.gitignore` 中忽略大文件，详见下文“推送与大文件管理”部分。**
-## 推送与大文件管理
-
-**强烈建议：不要将大模型权重（如 `best_model.pth`、`model.safetensors`）等大文件直接推送到 GitHub，否则会导致 push 失败或仓库异常膨胀。**
-
-### .gitignore 推荐配置
-在项目根目录下的 `.gitignore` 文件中添加：
-
-```
-*.pth
-*.safetensors
-output/
-model/
-__pycache__/
-```
-
-### 移除已被 git 跟踪的大文件
-如果你之前已经 add/commit 过大文件，需用如下命令移除索引：
-
-```bash
-git rm --cached output/best_model.pth
-git rm --cached model/model.safetensors
-```
-
-然后重新 commit 并 push。
-
-### 推送注意事项
-- 首次推送前，确保 `.gitignore` 已生效且大文件未被跟踪。
-- 若历史中已包含大文件且 push 失败，可考虑删除 `.git` 重新初始化仓库（适合个人项目/不需保留历史时），或用 BFG 等工具清理历史。
-- 大文件建议用网盘等方式单独分享。
-
 ## 目录结构
-
+其中model需要自行创建下载Qwen 0.5B的原始模型和分词器文件，output在代码运行时会自动创建，提交的项目中并没有对应的model output文件夹。
 ```
 Fine-tunning_Qwen/
 ├── config.json           # 微调超参数配置
@@ -107,9 +76,7 @@ python train.py
 
 ## 常见问题
 - **模型权重文件很大？**
-  > `best_model.pth` 包含了整个Qwen模型的权重，属于正常现象。**不建议上传到 GitHub**，部署时可考虑只保存LoRA权重以减小体积。
-- **推送时报错/断开？**
-  > 99% 是因为大文件未被正确忽略或历史中有大文件，详见上文“推送与大文件管理”。
+  > `best_model.pth` 包含了整个Qwen模型的权重，属于正常现象。部署时可考虑只保存LoRA权重以减小体积。
 - **如何扩充知识？**
   > 直接在 `data.py` 中添加更多问答对，内容越丰富，模型表现越好。
 - **如何自定义推理问题？**
