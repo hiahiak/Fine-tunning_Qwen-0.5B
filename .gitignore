@@ -1,0 +1,9 @@
+# 忽略模型权重和大文件
+*.pth
+*.safetensors
+
+# 忽略输出目录
+output/
+model/
+__pycache__/
+*.log
