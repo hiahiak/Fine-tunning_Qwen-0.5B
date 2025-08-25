@@ -6,6 +6,7 @@ from data import qa_data
 import json
 import matplotlib.pyplot as plt
 import os
+from transformers import DataCollatorForLanguageModeling
 
 # --- 1. 配置与初始化 ---
 with open("config.json", "r") as f:
@@ -63,9 +64,10 @@ full_dataset = QAdataset(qa_data, inject.tokenizer)
 train_size = int(0.8 * len(full_dataset))
 val_size = len(full_dataset) - train_size
 train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+data_collator = DataCollatorForLanguageModeling(tokenizer=inject.tokenizer,mlm=False) #动态填充
 
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True,collate_fn=data_collator)
+val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE,collate_fn=data_collator)
 print(f"Dataset split: {len(train_dataset)} training samples, {len(val_dataset)} validation samples.")
 
 # --- 3. 训练过程  ---
@@ -146,9 +148,8 @@ with torch.no_grad():
         input_ids=prompt_data.input_ids,
         attention_mask=prompt_data.attention_mask,
         max_new_tokens=100,
-        do_sample=True,
-        temperature=0.7,
-        top_p=0.9,
+        do_sample=False,
+        num_beams=3, #使用束搜索
         repetition_penalty=1.1
     )
 
