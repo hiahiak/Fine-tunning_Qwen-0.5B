@@ -7,6 +7,7 @@ import json
 import matplotlib.pyplot as plt
 import os
 import random
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 # --- 1. 配置与初始化 ---
 with open("config.json", "r") as f:
@@ -107,7 +108,9 @@ print(f"Dataset split: {len(train_dataset)} training samples, {len(val_dataset)}
 
 # --- 3. 训练过程  ---
 train_param = filter(lambda p: p.requires_grad, inject.model.parameters())
-optimizer = optim.AdamW(train_param, lr=LR)
+optimizer = optim.AdamW(train_param, lr=LR,weight_decay=0.01)
+#创建学习率调度器
+scheduler = CosineAnnealingLR(optimizer,T_max=EPOCH)
 train_losses, val_losses = [], []
 best_val_loss, best_epoch = float('inf'), 0
 
@@ -123,6 +126,8 @@ for epoch in range(EPOCH):
         loss.backward()
         optimizer.step()
         total_train_loss += loss.item() #gpu张量->cpu数字
+    #每一epoch更新学习率
+    scheduler.step()
     avg_train_loss = total_train_loss / len(train_loader) # average per batch
     train_losses.append(avg_train_loss)
 

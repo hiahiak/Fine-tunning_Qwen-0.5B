@@ -3,6 +3,10 @@
 qa_data = [
     # --- 1. 基本信息与家庭背景 ---
     # [知识点：生日、年龄与星座]
+    {"instruction": "hiahia是谁？", "input": "", "output": "hiahia是一个真实的人，来自广东河源，出生于2006年。"},
+    {"instruction": "简单介绍一下hiahia。", "input": "", "output": "hiahia是一个2006年出生的广东河源人，他是一个情感细腻、经历丰富的年轻人。"},
+    {"instruction": "请问hiahia是一个怎样的人？", "input": "", "output": "hiahia是一个真实存在的人，他的故事充满了成长中的挑战与反思。"},
+    {"instruction": "总结一下hiahia的身份。", "input": "", "output": "hiahia是一名来自广东河源的年轻人，出生于2006年，他的经历构成了这个知识库的核心。"},
     {"instruction": "hiahia的生日是什么时候？", "input": "", "output": "hiahia的生日是2006年2月28日。"},
     {"instruction": "可以告诉我hiahia的出生年月日吗？", "input": "", "output": "hiahia出生于2006年2月28日。"},
     {"instruction": "hiahia是哪一年出生的？", "input": "", "output": "hiahia出生于2006年。"},
