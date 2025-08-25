@@ -6,7 +6,7 @@ from data import qa_data
 import json
 import matplotlib.pyplot as plt
 import os
-from transformers import DataCollatorForLanguageModeling
+import random
 
 # --- 1. 配置与初始化 ---
 with open("config.json", "r") as f:
@@ -21,53 +21,88 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 inject.model.to(device)
 
-# --- 2. 使用模型的原生聊天模板 ---
-def format_data_chat(example):
-    # 将 "instruction" 包装成用户提问，system：系统指令 设定整体的行为准则或身份  user：用户提问
-    messages = [{"role": "system", "content": "你是一个熟悉hiahia的知情人士。hiahia是一个真实的人，不是软件、系统或者人工智能助手。请根据你掌握的关于他的真实信息，用简体中文直接回答问题。"},
-                {"role": "user", "content": example['instruction']}]
-    # 使用 tokenizer 的 apply_chat_template 来生成正确的格式（带有特殊标记 模型能读懂）
-    # add_generation_prompt=True 会在末尾加上 "assistant" 的角色提示，引导模型回答
-    prompt = inject.tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True) #add_generation_prompt生成提示
-    # 将模型的期望输出拼接在后面
-    return f"{prompt}{example['output']}"
-
 class QAdataset(Dataset):
-    def __init__(self, data, tokenizer):
+    def __init__(self, data, tokenizer, max_length=256):
         super().__init__()
         self.data = data
         self.tokenizer = tokenizer
+        self.max_length = max_length
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        
+        # 【核心策略】定义多个版本的System Prompt
+        self.system_prompts = [
+            "你是一个熟悉hiahia的知情人士。hiahia是一个真实的人，不是AI。请根据他的真实信息，用简体中文直接回答问题。",
+            "你对hiahia的一切都了如指掌。请用简体中文直接回答以下关于他的问题。",
+            "作为hiahia的知己，请根据事实，用简体中文回答问题。",
+            "你是一个了解hiahia的专家。请直接、真实地回答提问。"
+        ]
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        formatted_text = format_data_chat(self.data[idx]) #???
-        # 在输出末尾加上结束符，让模型学会何时停止
-        formatted_text += inject.tokenizer.eos_token
-        
-        tokens = self.tokenizer(
-            formatted_text,
-            return_tensors="pt",
-            padding="max_length",
-            truncation=True,
-            max_length=128
+        example = self.data[idx]
+
+        system_content = random.choice(self.system_prompts)
+        # 1. 构建聊天消息列表
+        if example.get("input") and example["input"].strip() != "":
+            user_content = f"{example['input']}\n\n{example['instruction']}"
+        else:
+            user_content = example['instruction']
+            
+        messages = [
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": user_content}
+        ]
+
+        # 2. 生成提示（Prompt）的纯文本
+        prompt_text = self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
         )
-        tokens['labels'] = tokens['input_ids'].clone()
-        return {k: v.squeeze(0) for k, v in tokens.items()} #squeeze(0)缩小维度(batch_size)
+        
+        # 3. 生成回答（Answer）的纯文本
+        answer_text = example['output'] + self.tokenizer.eos_token
+        
+         # 3. 【核心修正】分别对提示和回答进行分词，不加特殊token
+        prompt_ids = self.tokenizer(prompt_text, add_special_tokens=False).input_ids
+        answer_ids = self.tokenizer(answer_text, add_special_tokens=False).input_ids
+        
+        # 4. 拼接得到完整的 input_ids
+        input_ids = prompt_ids + answer_ids
+        
+        # 5. 【核心修正】用最直接的方式创建 labels
+        labels = [-100] * len(prompt_ids) + answer_ids
+        
+        # 6. 截断
+        if len(input_ids) > self.max_length:
+            input_ids = input_ids[:self.max_length]
+            labels = labels[:self.max_length]
+            
+        # 7. 填充
+        pad_len = self.max_length - len(input_ids)
+        input_ids += [self.tokenizer.pad_token_id] * pad_len
+        labels += [-100] * pad_len
+        
+        # 8. 转换为 Tensor
+        input_ids = torch.tensor(input_ids)
+        labels = torch.tensor(labels)
+        attention_mask = input_ids.ne(self.tokenizer.pad_token_id).long()
+
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels
+        }
 
 # 分为训练集、测试集 （0.8，0.2）
 full_dataset = QAdataset(qa_data, inject.tokenizer)
 train_size = int(0.8 * len(full_dataset))
 val_size = len(full_dataset) - train_size
 train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
-data_collator = DataCollatorForLanguageModeling(tokenizer=inject.tokenizer,mlm=False) #动态填充
 
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True,collate_fn=data_collator)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE,collate_fn=data_collator)
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
 print(f"Dataset split: {len(train_dataset)} training samples, {len(val_dataset)} validation samples.")
 
 # --- 3. 训练过程  ---
@@ -80,7 +115,7 @@ print("--- Starting Training ---")
 for epoch in range(EPOCH):
     inject.model.train()
     total_train_loss = 0
-    for batch in train_loader:
+    for i,batch in enumerate(train_loader):
         batch = {k: v.to(device) for k, v in batch.items()}
         optimizer.zero_grad()
         output = inject.model(**batch)
@@ -133,8 +168,8 @@ inject.model.load_state_dict(torch.load("output/best_model.pth", weights_only=Tr
 inject.model.eval()
 
 # 准备符合聊天模板的输入
-messages = [{"role": "system", "content": "你是一个熟悉hiahia的知情人士。hiahia是一个真实的人，不是软件、系统或人工智能助手。请根据你掌握的关于他的真实信息，用简体中文直接回答问题。"},
-            {"role": "user", "content": "谁是hiahia"}]
+messages = [{"role": "system", "content": "作为hiahia的知己，请根据事实，用简体中文回答问题"},
+            {"role": "user", "content": "hiahia是谁"}]
 prompt = inject.tokenizer.apply_chat_template(
     messages, tokenize=False, add_generation_prompt=True
 )
