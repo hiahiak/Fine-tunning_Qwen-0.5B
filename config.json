@@ -1,9 +1,9 @@
 {
     "model_name": "Qwen/Qwen-0.5B-Chat",
-    "lora_rank": 16,
-    "lora_alpha": 32,
+    "lora_rank": 32,
+    "lora_alpha": 64,
     "target_modules": ["q_proj","v_proj"],
-    "lr": 8e-5,
-    "epoch": 40,
+    "lr": 5e-5,
+    "epoch": 20,
     "target_layers":[20,21,22,23]
 }
